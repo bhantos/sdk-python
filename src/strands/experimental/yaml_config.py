@@ -3,6 +3,22 @@
 This module provides a class decorator and method decorators that enable loading
 agent, tool, and graph definitions from YAML and resolving symbolic references
 to runtime objects.
+
+Example:
+    ```python
+    from strands.experimental.yaml_config import StrandsYAMLBase, yaml_tool
+    from tests.fixtures.say_tool import say
+
+    @StrandsYAMLBase
+    class Runtime:
+        agents_config = "config/agents.yaml"
+        tools_config = "config/tools.yaml"
+        graphs_config = "config/graphs.yaml"
+
+        @yaml_tool
+        def build_search_tool(self):
+            return say
+    ```
 """
 
 import copy
@@ -42,10 +58,11 @@ yaml_graph = _mark_yaml_method("is_yaml_graph")
 yaml_model = _mark_yaml_method("is_yaml_model")
 
 
-class _StrandsYAMLRuntimeMixin:
+class StrandsYAMLRuntimeMixin:
     """Mixin that adds YAML configuration loading and resolution behavior."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the wrapped class instance and resolve YAML runtime objects."""
         super().__init__(*args, **kwargs)
         self._initialize_yaml_runtime()
 
@@ -102,7 +119,11 @@ class _StrandsYAMLRuntimeMixin:
         with open(path, encoding="utf-8") as file:
             content = yaml.safe_load(file)
 
-        if not isinstance(content, dict) or not content:
+        if not isinstance(content, dict):
+            raise ValueError(f"{config_name.capitalize()} config must be a non-empty YAML mapping: {path}")
+
+        if len(content) == 0:
+            # Reject empty mappings to surface misconfigured YAML early.
             raise ValueError(f"{config_name.capitalize()} config must be a non-empty YAML mapping: {path}")
 
         return cast(dict[str, Any], content)
@@ -194,7 +215,7 @@ class _StrandsYAMLRuntimeMixin:
 
         agent_info = self.agents_config.get(agent_name)
         if not isinstance(agent_info, dict):
-            raise ValueError(f"Agent '{agent_name}' config must be a mapping")
+            raise ValueError(f"Agent '{agent_name}' config must be a mapping, got {type(agent_info).__name__}")
 
         stack.append(agent_name)
         mapped_agent_info = self._map_agent_variables(agent_name, copy.deepcopy(agent_info), stack)
@@ -217,13 +238,12 @@ class _StrandsYAMLRuntimeMixin:
                 if model_name in self._model_factories:
                     agent_info[model_field] = self._invoke_factory(self._model_factories[model_name])
 
-        tools = agent_info.get("tools", [])
-        if tools is not None:
-            if not isinstance(tools, list):
-                raise ValueError(f"Agent '{agent_name}' tools must be a list")
-            agent_info["tools"] = [
-                self._resolve_agent_tool_reference(agent_name, tool_ref, stack) for tool_ref in tools
-            ]
+        tools = agent_info.get("tools")
+        if tools is None:
+            tools = []
+        if not isinstance(tools, list):
+            raise ValueError(f"Agent '{agent_name}' tools must be a list")
+        agent_info["tools"] = [self._resolve_agent_tool_reference(agent_name, tool_ref, stack) for tool_ref in tools]
 
         agent_tools = agent_info.pop("agent_tools", [])
         if agent_tools:
@@ -308,7 +328,7 @@ class _StrandsYAMLRuntimeMixin:
 
         graph_info = self.graphs_config.get(graph_name)
         if not isinstance(graph_info, dict):
-            raise ValueError(f"Graph '{graph_name}' config must be a mapping")
+            raise ValueError(f"Graph '{graph_name}' config must be a mapping, got {type(graph_info).__name__}")
 
         stack.append(graph_name)
         mapped_graph_info = self._map_graph_variables(graph_name, copy.deepcopy(graph_info), stack)
@@ -418,25 +438,25 @@ def StrandsYAMLBase(cls: T) -> T:
         - ``self.graphs`` (resolved graph map)
     """
 
-    class WrappedClass(_StrandsYAMLRuntimeMixin, cls):  # type: ignore[misc, valid-type]
+    class StrandsYAMLConfiguredClass(StrandsYAMLRuntimeMixin, cls):  # type: ignore[misc, valid-type]
         pass
 
-    WrappedClass.__name__ = cls.__name__
-    WrappedClass.__qualname__ = cls.__qualname__
-    WrappedClass.__module__ = cls.__module__
-    WrappedClass.__doc__ = cls.__doc__
+    StrandsYAMLConfiguredClass.__name__ = cls.__name__
+    StrandsYAMLConfiguredClass.__qualname__ = cls.__qualname__
+    StrandsYAMLConfiguredClass.__module__ = cls.__module__
+    StrandsYAMLConfiguredClass.__doc__ = cls.__doc__
 
     config_base_directory = getattr(cls, "config_base_directory", None)
     if config_base_directory is None:
         try:
-            WrappedClass.base_directory = Path(inspect.getfile(cls)).parent
+            StrandsYAMLConfiguredClass.base_directory = Path(inspect.getfile(cls)).parent
         except (TypeError, OSError):
-            WrappedClass.base_directory = Path.cwd()
+            StrandsYAMLConfiguredClass.base_directory = Path.cwd()
     else:
-        WrappedClass.base_directory = Path(config_base_directory)
+        StrandsYAMLConfiguredClass.base_directory = Path(config_base_directory)
 
-    WrappedClass.original_agents_config_path = getattr(cls, "agents_config", _DEFAULT_AGENTS_CONFIG_PATH)
-    WrappedClass.original_tools_config_path = getattr(cls, "tools_config", _DEFAULT_TOOLS_CONFIG_PATH)
-    WrappedClass.original_graphs_config_path = getattr(cls, "graphs_config", _DEFAULT_GRAPHS_CONFIG_PATH)
+    StrandsYAMLConfiguredClass.original_agents_config_path = getattr(cls, "agents_config", _DEFAULT_AGENTS_CONFIG_PATH)
+    StrandsYAMLConfiguredClass.original_tools_config_path = getattr(cls, "tools_config", _DEFAULT_TOOLS_CONFIG_PATH)
+    StrandsYAMLConfiguredClass.original_graphs_config_path = getattr(cls, "graphs_config", _DEFAULT_GRAPHS_CONFIG_PATH)
 
-    return cast(T, WrappedClass)
+    return cast(T, StrandsYAMLConfiguredClass)

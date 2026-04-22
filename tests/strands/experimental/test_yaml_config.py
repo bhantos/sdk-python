@@ -33,6 +33,7 @@ class _SampleYAMLRuntime:
 
 
 def _write_yaml(path: Path, data: Any) -> None:
+    """Create parent directories and write YAML data to a file path."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as file:
         yaml.safe_dump(data, file)
@@ -98,7 +99,16 @@ def test_yaml_runtime_raises_for_missing_yaml_file(tmp_path: Path):
     _write_yaml(base_dir / "tools.yaml", {"search": "tests.fixtures.say_tool:say"})
     _write_yaml(
         base_dir / "graphs.yaml",
-        {"simple_graph": {"nodes": {"writer_node": {"agent": "writer"}}, "entry_points": ["writer_node"]}},
+        {
+            "simple_graph": {
+                "nodes": {
+                    "writer_node": {
+                        "agent": "writer",
+                    }
+                },
+                "entry_points": ["writer_node"],
+            }
+        },
     )
 
     @StrandsYAMLBase
@@ -166,7 +176,13 @@ def test_yaml_runtime_raises_for_unknown_tool_reference(tmp_path: Path):
 
 def test_yaml_runtime_raises_for_agent_tool_cycles(tmp_path: Path):
     base_dir = tmp_path / "agent_cycle"
-    _write_yaml(base_dir / "agents.yaml", {"a": {"agent_tools": ["b"]}, "b": {"agent_tools": ["a"]}})
+    _write_yaml(
+        base_dir / "agents.yaml",
+        {
+            "a": {"model": "literal-model-id", "agent_tools": ["b"]},
+            "b": {"model": "literal-model-id", "agent_tools": ["a"]},
+        },
+    )
     _write_yaml(base_dir / "tools.yaml", {"search": "tests.fixtures.say_tool:say"})
     _write_yaml(base_dir / "graphs.yaml", {"g": {"nodes": {"n": "a"}, "entry_points": ["n"]}})
 
