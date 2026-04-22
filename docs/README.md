@@ -8,6 +8,7 @@ This folder contains documentation for contributors and developers working on th
 - [HOOKS.md](./HOOKS.md) - Hooks system rules and usage guide
 - [PR.md](./PR.md) - Pull request description guidelines
 - [MCP_CLIENT_ARCHITECTURE.md](./MCP_CLIENT_ARCHITECTURE.md) - MCP client threading architecture and design decisions
+- [YAML_CONFIG.md](./YAML_CONFIG.md) - Experimental CrewAI-style YAML runtime configuration
 
 ## Related Documentation
 

@@ -1,0 +1,10 @@
+editorial_graph:
+  nodes:
+    research_node: researcher
+    writing_node:
+      agent: writer
+  edges:
+    - from: research_node
+      to: writing_node
+  entry_points:
+    - research_node
