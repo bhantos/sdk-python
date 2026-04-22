@@ -1,0 +1,4 @@
+search_tool: build_search_tool
+
+path_tool:
+  value: tests.fixtures.say_tool:say

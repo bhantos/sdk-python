@@ -1,0 +1,13 @@
+researcher:
+  name: Researcher
+  model: literal-model-id
+  tools:
+    - search_tool
+
+writer:
+  name: Writer
+  model: model_from_factory
+  tools:
+    - path_tool
+  agent_tools:
+    - researcher
